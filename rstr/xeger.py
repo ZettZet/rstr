@@ -1,6 +1,8 @@
 import re
 import string
 from itertools import chain
+from typing import AnyStr, Callable, Dict, List, Pattern, Sequence, Tuple, Union
+from sre_constants import _NamedIntConstant
 
 # The * and + characters in a regular expression
 # match up to any number of repeats in theory,
@@ -9,6 +11,9 @@ from itertools import chain
 # generated strings. This sets an upper-bound on
 # repeats generated from + and * characters.
 STAR_PLUS_LIMIT = 100
+
+Operation = Tuple[_NamedIntConstant, Union['Operation',  # type: ignore
+                                           Sequence['Operation'], Tuple[int, int, Sequence['Operation']]], Tuple[int, int, int, Sequence['Operation']]]
 
 
 class Xeger(object):
@@ -19,8 +24,8 @@ class Xeger(object):
 
     def __init__(self):
         super(Xeger, self).__init__()
-        self._cache = dict()
-        self._categories = {
+        self._cache: Dict[int, str] = dict()
+        self._categories: Dict[str, Callable[[], str]] = {
             'category_digit': lambda: self._alphabets['digits'],
             'category_not_digit': lambda: self._alphabets['nondigits'],
             'category_space': lambda: self._alphabets['whitespace'],
@@ -28,8 +33,8 @@ class Xeger(object):
             'category_word': lambda: self._alphabets['word'],
             'category_not_word': lambda: self._alphabets['nonword'],
         }
-
-        self._cases = {
+# Callable[[Union[int, Tuple[int, int], Operation]], Union[str, Sequence[str], Sequence[bool]]]
+        self._cases: Dict[str, Callable[[Union[int, Sequence[Operation], Sequence[int], str, Sequence[Sequence[Operation]], Operation]], Union[str, Sequence[bool], Sequence[str]]]] = {
             'literal': lambda x: chr(x),
             'not_literal': lambda x: self._random.choice(string.printable.replace(chr(x), '')),
             'at': lambda x: '',
@@ -47,7 +52,7 @@ class Xeger(object):
             'negate': lambda x: [False],
         }
 
-    def xeger(self, string_or_regex):
+    def xeger(self, string_or_regex: Union[Pattern[AnyStr], str]):
         try:
             pattern = string_or_regex.pattern
         except AttributeError:
@@ -58,37 +63,39 @@ class Xeger(object):
         self._cache.clear()
         return result
 
-    def _build_string(self, parsed):
-        newstr = []
-        for state in parsed:
-            newstr.append(self._handle_state(state))
+    def _build_string(self, parsed: Sequence[Operation]) -> str:
+        newstr = [self._handle_state(item) for item in parsed]
+
         return ''.join(newstr)
 
-    def _handle_state(self, state):
+    def _handle_state(self, state: Operation) -> Union[str, Sequence[str], Sequence[bool]]:
         opcode, value = state
         opcode = str(opcode).lower()
         if opcode == 'category':
             value = value.name.lower()
         return self._cases[opcode](value)
 
-    def _handle_group(self, value):
+    def _handle_group(self, value: Sequence[Sequence[Operation]]) -> str:
         result = ''.join(self._handle_state(i) for i in value[-1])
         if value[0]:
             self._cache[value[0]] = result
         return result
 
-    def _handle_in(self, value):
-        candidates = list(chain(*(self._handle_state(i) for i in value)))
+    def _handle_in(self, value: Sequence[Operation]) -> str:
+        candidates: List[Union[str, bool]] = list(
+            chain(*(self._handle_state(i) for i in value)))
         if candidates[0] is False:
-            candidates = set(string.printable).difference(candidates[1:])
-            return self._random.choice(list(candidates))
+            candidates: List[str] = candidates[1:]
+            candidates = list(set(
+                string.printable).difference(candidates))
+            return self._random.choice(candidates)
         else:
             return self._random.choice(candidates)
 
-    def _handle_repeat(self, start_range, end_range, value):
-        result = []
-        end_range = min((end_range, STAR_PLUS_LIMIT))
-        times = self._random.randint(start_range, end_range)
-        for i in range(times):
+    def _handle_repeat(self, start_range: int, end_range: int, value: Sequence[Operation]) -> str:
+        result: List[str] = []
+        end_range = min(end_range, STAR_PLUS_LIMIT)
+        times: int = self._random.randint(start_range, end_range)
+        for _ in range(times):
             result.append(''.join(self._handle_state(i) for i in value))
         return ''.join(result)

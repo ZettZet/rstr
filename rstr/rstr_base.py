@@ -29,14 +29,17 @@
 
 import itertools
 import random
+from random import SystemRandom
 import string
 from copy import copy
 from functools import partial
+from typing import Callable, Dict, List, Optional, Sequence, Type, Union
+from types import ModuleType
 
 from rstr.xeger import Xeger
 
 
-ALPHABETS = {
+ALPHABETS: Dict[str, str] = {
     'printable': string.printable,
     'letters': string.ascii_letters,
     'uppercase': string.ascii_uppercase,
@@ -50,7 +53,8 @@ ALPHABETS = {
     'normal': string.ascii_letters + string.digits + ' ',
     'word': string.ascii_letters + string.digits + '_',
     'nonword': ''.join(
-        set(string.printable).difference(string.ascii_letters + string.digits + '_')
+        set(string.printable).difference(
+            string.ascii_letters + string.digits + '_')
     ),
     'unambiguous': ''.join(set(string.ascii_letters + string.digits).difference('0O1lI')),
     'postalsafe': string.ascii_letters + string.digits + ' .-#/',
@@ -91,32 +95,32 @@ class RstrBase(object):
 
     '''
 
-    def __init__(self, _random, **custom_alphabets):
+    def __init__(self, _random: ModuleType, **custom_alphabets: str) -> None:
         super(RstrBase, self).__init__()
         self._random = _random
         self._alphabets = copy(ALPHABETS)
         for alpha_name, alphabet in custom_alphabets.items():
             self.add_alphabet(alpha_name, alphabet)
 
-    def add_alphabet(self, alpha_name, characters):
+    def add_alphabet(self, alpha_name: str, characters: str) -> None:
         '''Add an additional alphabet to an Rstr instance and make it available
         via method calls.
 
         '''
         self._alphabets[alpha_name] = characters
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Callable[[Optional[int], Optional[int], Union[str, Sequence[str]], Union[str, Sequence[str]]], str]:
         if attr in self._alphabets:
             return partial(self.rstr, self._alphabets[attr])
         else:
             message = 'Rstr instance has no attribute: {0}'.format(attr)
             raise AttributeError(message)
 
-    def sample_wr(self, population, k):
+    def sample_wr(self, population: List[str], k: int) -> List[str]:
         '''Samples k random elements (with replacement) from a population'''
-        return [self._random.choice(population) for i in itertools.repeat(None, k)]
+        return [self._random.choice(population) for _ in itertools.repeat(None, k)]
 
-    def rstr(self, alphabet, start_range=None, end_range=None, include='', exclude=''):
+    def rstr(self, alphabet: Union[str, Sequence[str]], start_range: Optional[int] = None, end_range: Optional[int] = None, include: Union[str, Sequence[str]] = '', exclude: Union[str, Sequence[str]] = '') -> str:
         '''Generate a random string containing elements from 'alphabet'
 
         By default, rstr() will return a string between 1 and 10 characters.
@@ -144,7 +148,7 @@ class RstrBase(object):
             k = self._random.randint(start_range, end_range)
         # Make sure we don't generate too long a string
         # when adding 'include' to it:
-        k = k - len(include)
+        k: int = k - len(include)
 
         result = self.sample_wr(popul, k) + list(include)
         self._random.shuffle(result)
@@ -153,7 +157,8 @@ class RstrBase(object):
 
 class Rstr(RstrBase, Xeger):
 
-    def __init__(self, _random=random, **alphabets):
+    def __init__(self, _random: Union[ModuleType, SystemRandom] = random, **alphabets: str):
         super(Rstr, self).__init__(_random=_random, **alphabets)
+
 
 default_instance = Rstr()

@@ -1,10 +1,10 @@
 import unittest
-import rstr.tests.test_rstr
-import rstr.tests.test_xeger
-import rstr.tests.test_package_level_access
+from rstr.tests import test_rstr
+from rstr.tests import test_xeger
+from rstr.tests import test_package_level_access
 
 
-def suite():
+def suite() -> unittest.TestSuite:
     loader = unittest.TestLoader()
     suite = loader.loadTestsFromModule(test_rstr)
     suite.addTests(loader.loadTestsFromModule(test_xeger))
